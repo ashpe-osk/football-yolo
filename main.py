@@ -4,8 +4,8 @@ from track_player import Tracker
 
 def main():
     # Video path
-    video_path = r"C:\football-yolo\data\videos\08fd33_4.mp4"
-    model_path = r"C:\football-yolo\models\best.pt" 
+    video_path = r"C:\football-yolo\data\videos\vid001.mp4"
+    model_path = r"C:\football-yolo\models\new_best.pt" 
     print(f"Reading video from: {video_path}")
     
     # Read the video frames
@@ -28,7 +28,7 @@ def main():
     tracks = tracker.get_objects_tracks(
         video_frames,
         read_from_stub=False,  # CHANGED: False to regenerate tracks
-        stub_path="stubs/track_stubs.pkl"
+        stub_path="stubs/new_track_stubs.pkl"
     )
 
     # Draw Output
