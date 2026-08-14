@@ -19,7 +19,7 @@ def main():
     print(f"Successfully read {len(video_frames)} frames")
     
     # Output path
-    output_path = "output_videos/output_video.avi"
+    output_path = "output_videos/combined_video.avi"
     print(f"Saving video to: {output_path}")
 
     # Initialize the Tracker
@@ -28,7 +28,7 @@ def main():
     tracks = tracker.get_objects_tracks(
         video_frames,
         read_from_stub=False,  # CHANGED: False to regenerate tracks
-        stub_path="stubs/new_track_stubs.pkl"
+        stub_path="stubs/combined_track_stubs.pkl"
     )
 
     # Draw Output
