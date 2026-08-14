@@ -27,7 +27,7 @@ def main():
     
     tracks = tracker.get_objects_tracks(
         video_frames,
-        read_from_stub=False,  # CHANGED: False to regenerate tracks
+        read_from_stub=False,  # CHANGE TO: False to regenerate tracks, True to read from stub
         stub_path="stubs/combined_track_stubs.pkl"
     )
 
