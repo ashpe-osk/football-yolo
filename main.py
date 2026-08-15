@@ -1,4 +1,6 @@
 import os
+
+import cv2
 from utils.vid_utils import read_video, save_video
 from track_player import Tracker
 
@@ -30,6 +32,20 @@ def main():
         read_from_stub=True,  # CHANGE TO: False to regenerate tracks, True to read from stub
         stub_path="stubs/combined_track_stubs.pkl"
     )
+
+
+    # Save the cropped player images
+    # for track_id, player in tracks["players"][0].items():
+    #     bbox = player["bbox"]
+    #     frame = video_frames[0]  # Assuming you want to save the first frame's cropped image
+
+    #     # Crop the bbox from the frame
+    #     cropped_image = frame[int(bbox[1]):int(bbox[3]), int(bbox[0]):int(bbox[2])]
+
+    #     # Save the cropped image
+    #     cv2.imwrite(f"output_videos/player_cropped.jpg", cropped_image)
+    #     break
+
 
     # Draw Output
     output_video_frames = tracker.draw_annotations(video_frames, tracks)
