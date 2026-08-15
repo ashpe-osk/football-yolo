@@ -1,6 +1,7 @@
 from ultralytics import YOLO
 import supervision as sv
 import cv2
+import numpy as np
 import pickle
 import os
 import sys
@@ -542,6 +543,31 @@ class Tracker:
         return frame
 
 
+
+    # =====================================================
+    # DRAW TRIANGLE
+    # =====================================================
+
+    def draw_triangle(self, frame, bbox, color):
+        y = int(bbox[1])
+        x,_ = get_center_of_bbox(bbox)
+
+        triangle_points = np.array([
+            [x, y], 
+            [x - 10, y - 20],  
+            [x + 10, y - 20]   
+
+        ])
+
+        cv2.drawContours(frame, [triangle_points], 0, color, cv2.FILLED)
+        cv2.drawContours(frame, [triangle_points], 0, (0,0,0), 2)
+
+        return frame
+
+
+
+
+
     # =====================================================
     # DRAW ALL ANNOTATIONS
     # =====================================================
@@ -617,33 +643,14 @@ class Tracker:
             # BALL
             # =================================================
 
-            for _, ball in (
-                ball_dict.items()
-            ):
+            for track_id, ball in ball_dict.items():
 
-                bbox = ball["bbox"]
-
-
-                x_center, y_center = (
-                    get_center_of_bbox(
-                        bbox
-                    )
-                )
-
-
-                cv2.circle(
+                frame = self.draw_triangle(
                     frame,
 
-                    (
-                        int(x_center),
-                        int(y_center)
-                    ),
+                    ball["bbox"],
 
-                    10,
-
-                    (0, 255, 255),
-
-                    -1
+                    (0, 255, 0)
                 )
 
 
