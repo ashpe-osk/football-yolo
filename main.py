@@ -11,7 +11,7 @@ def main():
     # VIDEO / MODEL PATHS
     # ---------------------------------------------------------
 
-    video_path = r"C:\football-yolo\data\videos\vid001.mp4"
+    video_path = r"C:\football-yolo\data\videos\vid002.mp4"
     model_path = r"C:\football-yolo\models\new_best.pt"
 
     print(f"Reading video from: {video_path}")
