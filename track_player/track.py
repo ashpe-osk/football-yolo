@@ -2,6 +2,7 @@ from ultralytics import YOLO
 import supervision as sv
 import cv2
 import numpy as np
+import pandas as pd
 import pickle
 import os
 import sys
@@ -74,6 +75,20 @@ class Tracker:
         self.gmc_max_corners = 300
         self.gmc_min_points = 12
         self.debug_camera = True
+
+
+
+    def interpolate_ball_positions(self, ball_positions):
+        ball_positions = [x.get(1,{}).get("bbox",[]) for x in ball_positions]
+        df_ball_positions = pd.DataFrame(ball_positions, columns=["x1", "y1", "x2", "y2"])
+
+        # interpolate missing values
+        df_ball_positions = df_ball_positions.interpolate()
+        df_ball_positions = df_ball_positions.bfill()
+
+        ball_positions = [{1: {'bbox': x} } for x in df_ball_positions.to_numpy().tolist()]
+        
+        return ball_positions
 
     # =====================================================
     # DETECTION + TRACKING
@@ -608,16 +623,9 @@ class Tracker:
                     # If it exists, ensure it's the same.
                     if self.tracker_to_global[tid] != gid:
                         print(f"WARNING: BoT ID {tid} was previously mapped to Global {self.tracker_to_global[tid]}, but now assigned to {gid}. Keeping old mapping.")
-                        # Keep the old mapping; reassign gid to the old one to maintain consistency.
+                        
                         gid = self.tracker_to_global[tid]
-                        # Update the state for the correct Global ID? We need to rollback.
-                        # For simplicity, we force the assignment to use the old mapping.
-                        # This means we need to re-assign the detection to the old Global ID.
-                        # Since we have already updated the state for the new gid, we should revert.
-                        # To avoid complexity, we prevent the assignment in the first place by checking earlier.
-                        # But this is a safety net.
-                        # We'll just print a warning and keep the old mapping.
-
+                        
                 new_frame_tracks[gid] = {
                     "bbox": det["bbox"],
                     "tracker_id": tid,
@@ -748,8 +756,38 @@ class Tracker:
         cv2.drawContours(frame, [triangle_points], 0, color, cv2.FILLED)
         cv2.drawContours(frame, [triangle_points], 0, (0, 0, 0), 2)
         return frame
+    
+    def draw_team_ball_control(self, frame, frame_num, team_ball_control):
+        # Draw semi transparent rectangle 
+        overlay = frame.copy()
+        cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), cv2.FILLED)
+        alpha = 0.4
+        cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
-    def draw_annotations(self, video_frames, tracks):
+        team_ball_control_till_frame = team_ball_control[:frame_num + 1]
+
+        # Get number of times each team had the ball
+        team1_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 1].shape[0]
+        team2_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 2].shape[0]
+
+        total_frames = team1_num_frames + team2_num_frames
+        if total_frames == 0:
+            team1_percent = 0.0
+            team2_percent = 0.0
+        else:
+            team1_percent = team1_num_frames / total_frames * 100
+            team2_percent = team2_num_frames / total_frames * 100
+
+        # Header
+        cv2.putText(frame, "POSSESSION", (1400, 885), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4)
+        # Team 1
+        cv2.putText(frame, f"Team 1 Possession: {team1_percent:.2f}%", (1400, 925), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
+        # Team 2
+        cv2.putText(frame, f"Team 2 Possession: {team2_percent:.2f}%", (1400, 965), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
+
+        return frame 
+
+    def draw_annotations(self, video_frames, tracks, team_ball_control):
         output_video_frames = []
         for frame_num, frame in enumerate(video_frames):
             frame = frame.copy()
@@ -757,15 +795,24 @@ class Tracker:
             ball_dict = tracks["ball"][frame_num]
             referee_dict = tracks["referees"][frame_num]
 
+            # Draw players
             for track_id, player in player_dict.items():
                 color = player.get("team_color", (0, 0, 255))
                 frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
 
+                if player.get("has_ball", False):
+                    frame = self.draw_triangle(frame, player["bbox"], (255, 0, 0))
+
+            # Draw referees
             for _, referee in referee_dict.items():
                 frame = self.draw_ellipse(frame, referee["bbox"], (0, 255, 255))
-
+            # Draw ball
             for _, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
+
+            # Draw team ball control 
+            frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
+
 
             output_video_frames.append(frame)
         return output_video_frames

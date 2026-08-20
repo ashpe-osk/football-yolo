@@ -1,9 +1,10 @@
 import os
-
 import cv2
+import numpy as np
 from utils.vid_utils import read_video, save_video
 from track_player import Tracker
 from team_allocator import TeamAllocator
+from player_ball_assigner import PlayerBallAssigner
 
 
 def main():
@@ -48,9 +49,12 @@ def main():
 
     tracks = tracker.get_objects_tracks(
         video_frames,
-        read_from_stub=False,
+        read_from_stub=True, # Set to True to read from stub file instead of running detection
         stub_path="stubs/combined_track_stubs.pkl"
     )
+
+    # Interpolate ball positions
+    tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
 
     # ---------------------------------------------------------
     # INITIALIZE TEAM ALLOCATOR
@@ -131,13 +135,38 @@ def main():
                 "team_color"
             ] = team_allocator.team_colors[team]
 
+
+
+    # Assign ball acquisition to players
+    player_assigner = PlayerBallAssigner()
+    team_ball_control = []
+    for frame_num, player_track in enumerate(
+        tracks["players"]
+    ):
+
+        ball_bbox = tracks["ball"][frame_num][1]["bbox"]
+
+        assigned_player = player_assigner.assign_ball_to_players(
+            player_track,
+            ball_bbox
+        )
+
+        if assigned_player != -1:
+            tracks["players"][frame_num][assigned_player]["has_ball"] = True
+            team_ball_control.append(tracks['players'][frame_num][assigned_player]['team'])
+        else:
+            team_ball_control.append(team_ball_control[-1])
+    team_ball_control = np.array(team_ball_control)
+
+
     # ---------------------------------------------------------
     # DRAW OUTPUT
     # ---------------------------------------------------------
 
     output_video_frames = tracker.draw_annotations(
         video_frames,
-        tracks
+        tracks, 
+        team_ball_control
     )
 
     # ---------------------------------------------------------
