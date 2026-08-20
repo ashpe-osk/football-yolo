@@ -52,16 +52,9 @@ class Tracker:
         # GLOBAL TRACK SETTINGS
         # =================================================
 
-        # How long an old identity can remain recoverable.
         self.global_max_age = 300
-
-        # Normal position threshold.
         self.max_position_distance = 0.35
-
-        # Appearance threshold.
         self.max_appearance_distance = 0.65
-
-        # Normal combined threshold.
         self.max_combined_distance = 1.0
 
         # =================================================
@@ -76,18 +69,21 @@ class Tracker:
         self.gmc_min_points = 12
         self.debug_camera = True
 
+        # =================================================
+        # CAMERA MOVEMENT DATA
+        # =================================================
+        self.camera_movement_per_frame = []   # will store (tx, ty) per frame
 
+    # =====================================================
+    # BALL INTERPOLATION
+    # =====================================================
 
     def interpolate_ball_positions(self, ball_positions):
-        ball_positions = [x.get(1,{}).get("bbox",[]) for x in ball_positions]
+        ball_positions = [x.get(1, {}).get("bbox", []) for x in ball_positions]
         df_ball_positions = pd.DataFrame(ball_positions, columns=["x1", "y1", "x2", "y2"])
-
-        # interpolate missing values
         df_ball_positions = df_ball_positions.interpolate()
         df_ball_positions = df_ball_positions.bfill()
-
-        ball_positions = [{1: {'bbox': x} } for x in df_ball_positions.to_numpy().tolist()]
-        
+        ball_positions = [{1: {'bbox': x}} for x in df_ball_positions.to_numpy().tolist()]
         return ball_positions
 
     # =====================================================
@@ -117,6 +113,41 @@ class Tracker:
             })
             print(f"Frame {frame_num}: YOLOv26 tracking complete")
         return detections
+
+    # =====================================================
+    # CAMERA MOVEMENT COMPUTATION (standalone)
+    # =====================================================
+
+    def compute_camera_movement(self, frames):
+        """
+        Compute per‑frame camera translation (tx, ty) using optical flow.
+        Returns list of (tx, ty) for each frame (first frame is (0,0)).
+        """
+        if not frames:
+            return []
+
+        movement = [(0.0, 0.0)]  # first frame has no movement
+
+        previous_frame = frames[0]
+        for i in range(1, len(frames)):
+            _, motion, _ = self._estimate_camera_motion(previous_frame, frames[i])
+            # motion is already normalized, but we want actual translation in pixels
+            # we need to get the translation from the affine matrix.
+            # However _estimate_camera_motion returns the matrix as first element.
+            # Let's modify: we'll call a separate method to get the matrix.
+            # Better: reuse the existing logic.
+            # We'll just call _estimate_camera_motion and extract translation.
+            # But it returns matrix, motion_norm, points.
+            # We need the raw translation (tx, ty) in pixels.
+            # We'll write a small helper inside.
+            matrix, _, _ = self._estimate_camera_motion(previous_frame, frames[i])
+            tx = float(matrix[0, 2])
+            ty = float(matrix[1, 2])
+            movement.append((tx, ty))
+            previous_frame = frames[i]
+
+        self.camera_movement_per_frame = movement
+        return movement
 
     # =====================================================
     # BASIC GEOMETRY HELPERS
@@ -313,13 +344,12 @@ class Tracker:
             "last_frame": frame_num,
             "last_tracker_id": tracker_id
         }
-        # Only set mapping if not already present; if present, we should have used it.
         if tracker_id not in self.tracker_to_global:
             self.tracker_to_global[tracker_id] = gid
         return gid
 
     # =====================================================
-    # GLOBAL ID ASSOCIATION (MODIFIED)
+    # GLOBAL ID ASSOCIATION
     # =====================================================
 
     def _associate_global_ids(self, frames, tracks):
@@ -331,6 +361,9 @@ class Tracker:
         self.previous_detection_count = 0
         previous_frame = None
 
+        # Reset camera movement storage for this run
+        self.camera_movement_per_frame = []
+
         for frame_num, frame_tracks in enumerate(tracks["players"]):
             if frame_num >= len(frames):
                 break
@@ -340,8 +373,12 @@ class Tracker:
                 camera_matrix = np.eye(2, 3, dtype=np.float32)
                 camera_motion = 0.0
                 flow_points = 0
+                self.camera_movement_per_frame.append((0.0, 0.0))  # first frame
             else:
                 camera_matrix, camera_motion, flow_points = self._estimate_camera_motion(previous_frame, frame)
+                tx = float(camera_matrix[0, 2])
+                ty = float(camera_matrix[1, 2])
+                self.camera_movement_per_frame.append((tx, ty))
 
             self.camera_transforms[frame_num] = camera_matrix
             current_detection_count = len(frame_tracks)
@@ -383,10 +420,7 @@ class Tracker:
             assignments = {}
             used_global_ids = set()
 
-            # =========================================================
             # 6. PRESERVE DIRECT BoT-SORT CONTINUITY (FORCED)
-            # =========================================================
-            # If a BoT ID already has a mapping, we MUST use that Global ID.
             for det in detections:
                 tid = det["tracker_id"]
                 gid = self.tracker_to_global.get(tid)
@@ -399,18 +433,13 @@ class Tracker:
                 if age <= self.global_max_age and gid not in used_global_ids:
                     assignments[tid] = gid
                     used_global_ids.add(gid)
-                    # This BoT ID is forced to this Global ID; we skip candidate matching.
 
-            # =========================================================
-            # 7. BUILD MATCHING CANDIDATES (only for BoT IDs without mapping)
-            # =========================================================
+            # 7. BUILD MATCHING CANDIDATES
             candidates = []
             for det in detections:
                 tid = det["tracker_id"]
                 if tid in assignments:
                     continue
-                # If this BoT ID already has a mapping, we should have assigned it.
-                # But if not, proceed.
                 bbox = det["bbox"]
                 center = det["center"]
                 appearance = det["appearance"]
@@ -454,18 +483,13 @@ class Tracker:
             candidates.sort(key=lambda x: x[0])
             assigned_tids = set(assignments.keys())
 
-            # =========================================================
             # 9. ONE-TO-ONE ASSIGNMENT
-            # =========================================================
             for candidate in candidates:
                 score, tid, gid, position_score, appearance_score, size_score, iou_score = candidate
                 if tid in assigned_tids or gid in used_global_ids:
                     continue
-                # Ensure we don't assign a different Global ID to a BoT ID that already has a mapping.
                 existing_gid = self.tracker_to_global.get(tid)
                 if existing_gid is not None and existing_gid != gid:
-                    # This BoT ID already has a mapping; we must use that one.
-                    # Skip this candidate.
                     continue
                 assignments[tid] = gid
                 assigned_tids.add(tid)
@@ -475,18 +499,14 @@ class Tracker:
                 else:
                     print(f"Frame {frame_num}: RE-ID: BoT {tid} -> Global {gid} (score={score:.3f})")
 
-            # =========================================================
             # 9.5 FALLBACK ASSIGNMENT
-            # =========================================================
             for det in detections:
                 tid = det["tracker_id"]
                 if tid in assigned_tids:
                     continue
 
-                # If this BoT ID already has a mapping, we MUST use that Global ID.
                 existing_gid = self.tracker_to_global.get(tid)
                 if existing_gid is not None:
-                    # Force assignment to existing Global ID.
                     state = self.global_tracks.get(existing_gid)
                     if state is not None:
                         age = frame_num - state["last_frame"]
@@ -498,9 +518,8 @@ class Tracker:
                                 print(f"Frame {frame_num}: FORCED (existing mapping): BoT {tid} -> Global {existing_gid} (recovery)")
                             else:
                                 print(f"Frame {frame_num}: FORCED (existing mapping): BoT {tid} -> Global {existing_gid}")
-                            continue  # Skip fallback for this detection.
+                            continue
 
-                # No mapping: find best candidate among all Global IDs.
                 best_score = float('inf')
                 best_gid = None
                 best_appearance = 1.0
@@ -520,7 +539,6 @@ class Tracker:
                     predicted = predicted_positions.get(gid, state["center"])
                     abs_distance = np.linalg.norm(center - predicted)
 
-                    # Position score (normalized)
                     bw, bh = self._bbox_size(bbox)
                     player_scale = max(35.0, float(np.sqrt(bw * bw + bh * bh)))
                     if recovery_mode:
@@ -549,7 +567,6 @@ class Tracker:
                         best_appearance = appearance_score
                         best_position = position_score
 
-                # Apply fallback if conditions met.
                 max_score = 2.0 if recovery_mode else 1.5
                 max_position = 2.0 if recovery_mode else 1.5
                 max_appearance = 0.60
@@ -563,7 +580,6 @@ class Tracker:
                     assignments[tid] = best_gid
                     assigned_tids.add(tid)
                     used_global_ids.add(best_gid)
-                    # Set mapping for this BoT ID (if not already set).
                     if tid not in self.tracker_to_global:
                         self.tracker_to_global[tid] = best_gid
                     if recovery_mode:
@@ -571,22 +587,17 @@ class Tracker:
                     else:
                         print(f"Frame {frame_num}: FALLBACK: BoT {tid} -> Global {best_gid} (score={best_score:.3f})")
 
-            # =========================================================
             # 10. CREATE NEW GLOBAL IDS
-            # =========================================================
             for det in detections:
                 tid = det["tracker_id"]
                 if tid in assignments:
                     continue
-                # This BoT ID has no mapping and no match; create a new Global ID.
                 gid = self._create_global_id(tid, det["bbox"], frame, frame_num, det["appearance"])
                 assignments[tid] = gid
                 used_global_ids.add(gid)
                 print(f"Frame {frame_num}: NEW: BoT {tid} -> Global {gid}")
 
-            # =========================================================
             # 11. UPDATE GLOBAL TRACK STATES
-            # =========================================================
             new_frame_tracks = {}
             for det in detections:
                 tid = det["tracker_id"]
@@ -616,16 +627,13 @@ class Tracker:
                             updated = updated / norm
                         state["appearance"] = updated.astype(np.float32)
 
-                # Update mapping only if it's not already set, or if it's the same.
                 if tid not in self.tracker_to_global:
                     self.tracker_to_global[tid] = gid
                 else:
-                    # If it exists, ensure it's the same.
                     if self.tracker_to_global[tid] != gid:
                         print(f"WARNING: BoT ID {tid} was previously mapped to Global {self.tracker_to_global[tid]}, but now assigned to {gid}. Keeping old mapping.")
-                        
                         gid = self.tracker_to_global[tid]
-                        
+
                 new_frame_tracks[gid] = {
                     "bbox": det["bbox"],
                     "tracker_id": tid,
@@ -641,6 +649,28 @@ class Tracker:
             previous_frame = frame
 
         return tracks
+
+    # =====================================================
+    # DRAW CAMERA MOVEMENT
+    # =====================================================
+
+    def draw_camera_movement(self, frames, camera_movement_per_frame):
+        output_frames = []
+        for frame_num, frame in enumerate(frames):
+            frame = frame.copy()
+            overlay = frame.copy()
+            cv2.rectangle(overlay, (0, 0), (500, 100), (255, 255, 255), -1)
+            alpha = 0.6
+            cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
+
+            x_movement, y_movement = camera_movement_per_frame[frame_num]
+            cv2.putText(frame, f"Camera Movement X: {x_movement:.2f}", (10, 30),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+            cv2.putText(frame, f"Camera Movement Y: {y_movement:.2f}", (10, 70),
+                        cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0), 3)
+
+            output_frames.append(frame)
+        return output_frames
 
     # =====================================================
     # GET TRACKS
@@ -756,20 +786,16 @@ class Tracker:
         cv2.drawContours(frame, [triangle_points], 0, color, cv2.FILLED)
         cv2.drawContours(frame, [triangle_points], 0, (0, 0, 0), 2)
         return frame
-    
+
     def draw_team_ball_control(self, frame, frame_num, team_ball_control):
-        # Draw semi transparent rectangle 
         overlay = frame.copy()
         cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), cv2.FILLED)
         alpha = 0.4
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
         team_ball_control_till_frame = team_ball_control[:frame_num + 1]
-
-        # Get number of times each team had the ball
         team1_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 1].shape[0]
         team2_num_frames = team_ball_control_till_frame[team_ball_control_till_frame == 2].shape[0]
-
         total_frames = team1_num_frames + team2_num_frames
         if total_frames == 0:
             team1_percent = 0.0
@@ -778,14 +804,11 @@ class Tracker:
             team1_percent = team1_num_frames / total_frames * 100
             team2_percent = team2_num_frames / total_frames * 100
 
-        # Header
         cv2.putText(frame, "POSSESSION", (1400, 885), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4)
-        # Team 1
         cv2.putText(frame, f"Team 1 Possession: {team1_percent:.2f}%", (1400, 925), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
-        # Team 2
         cv2.putText(frame, f"Team 2 Possession: {team2_percent:.2f}%", (1400, 965), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
 
-        return frame 
+        return frame
 
     def draw_annotations(self, video_frames, tracks, team_ball_control):
         output_video_frames = []
@@ -795,24 +818,19 @@ class Tracker:
             ball_dict = tracks["ball"][frame_num]
             referee_dict = tracks["referees"][frame_num]
 
-            # Draw players
             for track_id, player in player_dict.items():
                 color = player.get("team_color", (0, 0, 255))
                 frame = self.draw_ellipse(frame, player["bbox"], color, track_id)
-
                 if player.get("has_ball", False):
                     frame = self.draw_triangle(frame, player["bbox"], (255, 0, 0))
 
-            # Draw referees
             for _, referee in referee_dict.items():
                 frame = self.draw_ellipse(frame, referee["bbox"], (0, 255, 255))
-            # Draw ball
+
             for _, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
 
-            # Draw team ball control 
             frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
-
 
             output_video_frames.append(frame)
         return output_video_frames

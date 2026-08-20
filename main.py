@@ -5,8 +5,6 @@ from utils.vid_utils import read_video, save_video
 from track_player import Tracker
 from team_allocator import TeamAllocator
 from player_ball_assigner import PlayerBallAssigner
-from camera_movement import CameraMovementEstimator
-
 
 
 def main():
@@ -51,18 +49,9 @@ def main():
 
     tracks = tracker.get_objects_tracks(
         video_frames,
-        read_from_stub=True, # Set to True to read from stub file instead of running detection
+        read_from_stub=True,
         stub_path="stubs/combined_track_stubs.pkl"
     )
-
-    # Camera movement estimation
-    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
-    camera_movement_per_frmae = camera_movement_estimator.get_camera_movement(
-        video_frames,
-        read_from_stub=True, # Set to True to read from stub file instead of running detection
-        stub_path="stubs/camera_movement_stubs.pkl"
-    )
-
 
     # Interpolate ball positions
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
@@ -76,25 +65,14 @@ def main():
     # ---------------------------------------------------------
     # FIND A GOOD INITIAL FRAME
     # ---------------------------------------------------------
-    #
-    # Instead of blindly using frame 0, look through the first
-    # 50 frames and select the frame containing the most players.
-    #
-    # This gives KMeans more useful player observations for
-    # establishing the two team colors.
-    #
 
     best_frame_num = None
     max_players = 0
-
     search_frames = min(50, len(video_frames))
 
     for frame_num in range(search_frames):
-
         player_tracks = tracks["players"][frame_num]
-
         player_count = len(player_tracks)
-
         if player_count > max_players:
             max_players = player_count
             best_frame_num = frame_num
@@ -121,83 +99,61 @@ def main():
     # ASSIGN TEAMS TO ALL PLAYERS
     # ---------------------------------------------------------
 
-    for frame_num, player_track in enumerate(
-        tracks["players"]
-    ):
-
+    for frame_num, player_track in enumerate(tracks["players"]):
         frame = video_frames[frame_num]
-
         for player_id, track in player_track.items():
-
             bbox = track["bbox"]
-
-            # player_id is now the GLOBAL ID
-            team = team_allocator.get_player_team(
-                frame,
-                bbox,
-                player_id
-            )
-
-            # Save team assignment
+            team = team_allocator.get_player_team(frame, bbox, player_id)
             tracks["players"][frame_num][player_id]["team"] = team
+            tracks["players"][frame_num][player_id]["team_color"] = team_allocator.team_colors[team]
 
-            # Save team color
-            tracks["players"][frame_num][player_id][
-                "team_color"
-            ] = team_allocator.team_colors[team]
+    # ---------------------------------------------------------
+    # BALL ASSIGNMENT
+    # ---------------------------------------------------------
 
-
-
-    # Assign ball acquisition to players
     player_assigner = PlayerBallAssigner()
     team_ball_control = []
-    for frame_num, player_track in enumerate(
-        tracks["players"]
-    ):
-
+    for frame_num, player_track in enumerate(tracks["players"]):
         ball_bbox = tracks["ball"][frame_num][1]["bbox"]
-
-        assigned_player = player_assigner.assign_ball_to_players(
-            player_track,
-            ball_bbox
-        )
-
+        assigned_player = player_assigner.assign_ball_to_players(player_track, ball_bbox)
         if assigned_player != -1:
             tracks["players"][frame_num][assigned_player]["has_ball"] = True
             team_ball_control.append(tracks['players'][frame_num][assigned_player]['team'])
         else:
-            team_ball_control.append(team_ball_control[-1])
+            team_ball_control.append(team_ball_control[-1] if team_ball_control else 0)
     team_ball_control = np.array(team_ball_control)
 
-
     # ---------------------------------------------------------
-    # DRAW OUTPUT
+    # DRAW ANNOTATIONS
     # ---------------------------------------------------------
 
     output_video_frames = tracker.draw_annotations(
         video_frames,
-        tracks, 
+        tracks,
         team_ball_control
     )
 
+    # ---------------------------------------------------------
+    # DRAW CAMERA MOVEMENT (using tracker's own data)
+    # ---------------------------------------------------------
 
-    # Draw camera movent 
-    output_video_frames = camera_movement_estimator.draw_camera_movement(
+    # If we already have camera movement from association, use it.
+    # If not (e.g., read_from_stub True and stub already had global IDs),
+    # we need to compute it.
+    if not tracker.camera_movement_per_frame:
+        # Compute from frames
+        tracker.compute_camera_movement(video_frames)
+
+    output_video_frames = tracker.draw_camera_movement(
         output_video_frames,
-        camera_movement_per_frmae
+        tracker.camera_movement_per_frame
     )
-
-
 
     # ---------------------------------------------------------
     # SAVE VIDEO
     # ---------------------------------------------------------
 
-    success = save_video(
-        output_video_frames,
-        output_path
-    )
-
+    success = save_video(output_video_frames, output_path)
     if success:
         print("Video processing complete!")
     else:
