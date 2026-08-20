@@ -5,6 +5,8 @@ from utils.vid_utils import read_video, save_video
 from track_player import Tracker
 from team_allocator import TeamAllocator
 from player_ball_assigner import PlayerBallAssigner
+from camera_movement import CameraMovementEstimator
+
 
 
 def main():
@@ -52,6 +54,15 @@ def main():
         read_from_stub=True, # Set to True to read from stub file instead of running detection
         stub_path="stubs/combined_track_stubs.pkl"
     )
+
+    # Camera movement estimation
+    camera_movement_estimator = CameraMovementEstimator(video_frames[0])
+    camera_movement_per_frmae = camera_movement_estimator.get_camera_movement(
+        video_frames,
+        read_from_stub=True, # Set to True to read from stub file instead of running detection
+        stub_path="stubs/camera_movement_stubs.pkl"
+    )
+
 
     # Interpolate ball positions
     tracks["ball"] = tracker.interpolate_ball_positions(tracks["ball"])
@@ -168,6 +179,15 @@ def main():
         tracks, 
         team_ball_control
     )
+
+
+    # Draw camera movent 
+    output_video_frames = camera_movement_estimator.draw_camera_movement(
+        output_video_frames,
+        camera_movement_per_frmae
+    )
+
+
 
     # ---------------------------------------------------------
     # SAVE VIDEO
