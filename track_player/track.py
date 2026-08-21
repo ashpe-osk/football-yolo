@@ -130,16 +130,6 @@ class Tracker:
 
         previous_frame = frames[0]
         for i in range(1, len(frames)):
-            _, motion, _ = self._estimate_camera_motion(previous_frame, frames[i])
-            # motion is already normalized, but we want actual translation in pixels
-            # we need to get the translation from the affine matrix.
-            # However _estimate_camera_motion returns the matrix as first element.
-            # Let's modify: we'll call a separate method to get the matrix.
-            # Better: reuse the existing logic.
-            # We'll just call _estimate_camera_motion and extract translation.
-            # But it returns matrix, motion_norm, points.
-            # We need the raw translation (tx, ty) in pixels.
-            # We'll write a small helper inside.
             matrix, _, _ = self._estimate_camera_motion(previous_frame, frames[i])
             tx = float(matrix[0, 2])
             ty = float(matrix[1, 2])
@@ -159,6 +149,15 @@ class Tracker:
             [(bbox[0] + bbox[2]) / 2.0, (bbox[1] + bbox[3]) / 2.0],
             dtype=np.float32
         )
+
+    @staticmethod
+    def _get_foot_position(bbox):
+        """
+        Compute the foot position (bottom‑center) of a bounding box.
+        Returns (cx, y_bottom) as integers.
+        """
+        x1, y1, x2, y2 = bbox
+        return int((x1 + x2) / 2), int(y2)
 
     @staticmethod
     def _bbox_size(bbox):
@@ -648,6 +647,32 @@ class Tracker:
             self.previous_detection_count = current_detection_count
             previous_frame = frame
 
+        return tracks
+
+    # =====================================================
+    # ADD POSITIONS TO TRACKS
+    # =====================================================
+
+    def add_positions_to_tracks(self, tracks):
+        """
+        Adds a 'position' field to every tracked object in all frames.
+        - For the ball: center of the bounding box.
+        - For players and referees: foot position (bottom‑center of the bbox).
+        """
+        for object_name, object_tracks in tracks.items():
+            if object_name not in ["players", "referees", "ball"]:
+                continue
+            for frame_num, track_dict in enumerate(object_tracks):
+                for track_id, track_info in track_dict.items():
+                    bbox = track_info['bbox']
+                    if object_name == 'ball':
+                        # Use center for ball
+                        center = self._bbox_center(bbox)
+                        position = (center[0], center[1])  # as tuple/list
+                    else:
+                        # Use foot position for players and referees
+                        position = self._get_foot_position(bbox)
+                    track_info['position'] = position
         return tracks
 
     # =====================================================
