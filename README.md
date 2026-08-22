@@ -6,9 +6,26 @@ A computer vision project focused on extracting football analytics from broadcas
 
 ## Demo
 
-[Watch the demo video](football_yolo_videos_demo/demo_vid.avi)
+[![Watch the demo](images/demo_thumbnail.png)](https://ashpe-osk.github.io/football-yolo/)
 
-The demo shows player detection, persistent tracking IDs, team classification, ball tracking, possession estimation, and camera-movement analysis on real broadcast footage.
+Click the thumbnail to watch on the project's GitHub Pages demo site. The demo shows player detection, persistent tracking IDs, team classification, ball tracking, possession estimation, and camera-movement analysis on real broadcast footage.
+
+<details>
+<summary>Demo setup (one-time)</summary>
+
+1. **Compress the source video** (`.avi` → `.mp4`, keeps quality while cutting size well below GitHub Pages' comfortable range):
+   ```bash
+   ffmpeg -i football_yolo_videos_demo/demo_vid.avi \
+     -vcodec libx264 -crf 28 -preset slow \
+     -vf "scale=1280:-2" -movflags +faststart \
+     -acodec aac -b:a 128k \
+     docs/assets/demo_vid.mp4
+   ```
+2. Save a representative frame as `docs/assets/demo_thumbnail.png` (used as the video poster) and also as `images/demo_thumbnail.png` (used as the README thumbnail).
+3. In the repo: **Settings → Pages → Deploy from a branch → branch `main`, folder `/docs`**.
+4. Site goes live at `https://<username>.github.io/<repo>/` — update the link above if your username/repo differ.
+
+</details>
 
 ## Features
 
@@ -35,25 +52,11 @@ flowchart LR
     A --> O[Teams • possession • movement]
 ```
 
-**Camera-motion compensation:** OpenCV optical-flow estimation detects broadcast camera movement so player positions can be interpreted more reliably during pans and transitions.
+**Player pipeline:** YOLOv26 detects players, BoT-SORT maintains temporal tracking, and a custom ReID-style identity layer stabilizes IDs using appearance, position, bounding-box consistency, and camera-motion compensation.
 
-## Computer Vision Pipeline
+**Ball/referee pipeline:** a separately fine-tuned YOLO11 model detects the ball and referees, with confidence-based selection supporting ball trajectory continuity.
 
-### Player Understanding
-
-YOLOv26 detects players while BoT-SORT maintains temporal tracking. A custom ReID-style identity-association layer improves stability by combining appearance features, position prediction, bounding-box consistency, and camera-motion compensation.
-
-### Ball and Referee Detection
-
-A separate YOLO11 model handles football-specific objects:
-
-- Ball detection
-- Referee detection
-- Ball trajectory support
-
-### Video Intelligence
-
-OpenCV-based processing supports optical-flow camera-motion estimation, coordinate transformation, and player movement analysis.
+**Camera-motion compensation:** OpenCV optical-flow estimation detects broadcast camera movement so player positions can be interpreted reliably during pans and transitions.
 
 ## Tech Stack
 
@@ -67,42 +70,17 @@ OpenCV-based processing supports optical-flow camera-motion estimation, coordina
 
 ## Challenges Solved
 
-- **Identity persistence:** Occlusions, similar jerseys, fast movement, and camera changes can break naive tracking. Appearance, position, and bounding-box signals are combined to improve consistency.
-- **Camera motion:** Broadcast pans and transitions distort raw player motion. Optical-flow estimation helps isolate camera movement from scene movement.
-- **Small-object detection:** The ball is small, fast, and frequently occluded, so it is handled by a dedicated football-object model.
+- **Identity persistence:** occlusions, similar jerseys, fast movement, and camera changes can break naive tracking. Appearance, position, and bounding-box signals are combined to improve consistency.
+- **Camera motion:** broadcast pans and transitions distort raw player motion. Optical-flow estimation helps isolate camera movement from scene movement.
+- **Small-object detection:** the ball is small, fast, and frequently occluded, so it's handled by a dedicated football-object model.
 
 ## Current Limitations
 
-Building reliable football intelligence from broadcast video remains a challenging computer vision problem. Current limitations include:
-
-### Player Identity Persistence
-
-- Player identities can occasionally switch during heavy occlusions, rapid movements, or crowded situations.
-- The current ReID approach improves tracking consistency within a video sequence but does not yet perform full professional-level player recognition.
-
-### Broadcast Camera Variations
-
-- The system is optimized for single broadcast camera footage.
-- Different camera angles, zoom changes, and cuts can affect tracking stability.
-- Multi-camera synchronization and cross-view identity matching are future improvements.
-
-### Ball Tracking Challenges
-
-- The football is a small and fast-moving object, making detection difficult during:
-    - Long passes
-    - Occlusions
-    - Motion blur
-    - Crowded player interactions
-
-### Event Understanding
-
-- Current analytics focus on tracking and possession-based insights.
-- Advanced football events such as passes, shots, goals, fouls, and tactical actions require additional temporal reasoning models.
-
-### Real-Time Deployment
-
-- The current pipeline prioritizes accuracy and analysis quality.
-- Further optimization is required for real-time inference on edge devices or live match processing.
+- **Identity switches:** can occur during heavy occlusions, rapid movements, or crowded situations — the current ReID approach improves in-sequence consistency but isn't full professional-level player recognition.
+- **Single-camera assumption:** optimized for one broadcast camera; different angles, zoom changes, and cuts affect tracking stability. Multi-camera synchronization is a future improvement.
+- **Ball tracking:** detection gets harder during long passes, occlusions, motion blur, and crowded interactions.
+- **Event understanding:** current analytics cover tracking and possession; passes, shots, goals, fouls, and tactical actions need additional temporal reasoning models.
+- **Real-time deployment:** the pipeline prioritizes accuracy over speed; further optimization is needed for live or edge-device inference.
 
 ## Future Improvements
 
@@ -111,7 +89,6 @@ Building reliable football intelligence from broadcast video remains a challengi
 - Pass, shot, and goal detection
 - Player-duel detection
 - Tactical shape analysis and heatmaps
-- Advanced football analytics
 
 ## Repository Structure
 
@@ -122,8 +99,8 @@ team_allocator/               Jersey-color team classification
 player_ball_assigner/         Ball-to-player assignment
 camera_movement/              Camera-motion utilities
 utils/                        Video and bounding-box helpers
-images/                       README portfolio banner
-football_yolo_videos_demo/    Annotated demo video
+images/                       README portfolio banner + demo thumbnail
+docs/                         GitHub Pages demo site (index.html + compressed demo video)
 ```
 
 ## Credits

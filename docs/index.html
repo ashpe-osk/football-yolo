@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Football YOLO — Demo</title>
+<style>
+  :root {
+    --green: #39d682;
+    --green-dim: #228252;
+    --bg: #0a0e0d;
+    --bg2: #10161a;
+    --text: #f5f7f6;
+    --grey: #96a0a2;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 64px 24px;
+  }
+  .eyebrow {
+    color: var(--green-dim);
+    letter-spacing: 0.12em;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  h1 {
+    font-size: 40px;
+    margin: 0 0 8px 0;
+    font-weight: 800;
+  }
+  h1 span { color: var(--green); }
+  p.subtitle {
+    color: var(--grey);
+    font-size: 17px;
+    margin: 0 0 40px 0;
+    text-align: center;
+    max-width: 620px;
+    line-height: 1.5;
+  }
+  .video-wrap {
+    width: 100%;
+    max-width: 960px;
+    border: 1px solid rgba(57, 214, 130, 0.35);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+  video {
+    width: 100%;
+    display: block;
+    background: #000;
+  }
+  .tags {
+    margin-top: 28px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+    max-width: 720px;
+  }
+  .tag {
+    font-size: 13px;
+    color: var(--grey);
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 6px 14px;
+    border-radius: 20px;
+  }
+  a.back {
+    margin-top: 48px;
+    color: var(--green);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid rgba(57, 214, 130, 0.35);
+    padding: 10px 20px;
+    border-radius: 6px;
+    transition: background 0.15s ease;
+  }
+  a.back:hover { background: rgba(57, 214, 130, 0.08); }
+  footer {
+    margin-top: 40px;
+    color: #5c6664;
+    font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+  <div class="eyebrow">Computer Vision · Broadcast Football Analytics</div>
+  <h1>Football <span>YOLO</span> — Demo</h1>
+  <p class="subtitle">
+    Player detection, persistent tracking IDs, team classification, ball tracking,
+    possession estimation, and camera-movement analysis running together on real
+    broadcast footage.
+  </p>
+
+  <div class="video-wrap">
+    <video controls preload="metadata" poster="assets/demo_thumbnail.png">
+      <source src="assets/demo_vid.mp4" type="video/mp4">
+      Your browser doesn't support HTML5 video. You can
+      <a href="assets/demo_vid.mp4">download the clip directly</a> instead.
+    </video>
+  </div>
+
+  <div class="tags">
+    <span class="tag">YOLOv26 Player Tracking</span>
+    <span class="tag">YOLO11 Ball / Referee</span>
+    <span class="tag">BoT-SORT + ReID</span>
+    <span class="tag">Team Classification</span>
+    <span class="tag">Possession Estimation</span>
+    <span class="tag">Camera Motion Compensation</span>
+  </div>
+
+  <a class="back" href="https://github.com/ashpe-osk/football-yolo">← Back to repository</a>
+
+  <footer>Football YOLO · Ashpe Osk</footer>
+
+</body>
+</html>
