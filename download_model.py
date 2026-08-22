@@ -13,5 +13,5 @@ model_path = hf_hub_download(
     local_dir_use_symlinks=False,  # Download the actual file
 )
 
-print(f"✅ Model downloaded to: {model_path}")
-print(f"📁 File size: {os.path.getsize(model_path) / (1024*1024):.1f} MB")
+print(f"Model downloaded to: {model_path}")
+print(f"File size: {os.path.getsize(model_path) / (1024*1024):.1f} MB")

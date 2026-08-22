@@ -1,5 +1,6 @@
 # Virtual Environment
 football-yolo-env/
+.venv/
 venv/
 env/
 ENV/
@@ -54,6 +55,10 @@ runs/
 outputs/
 results/
 predictions/
+yolo26_output/
+output_videos/
+cropped_images/
+stubs/
 
 # Data files (LARGE videos/images)
 data/
@@ -75,6 +80,8 @@ data/
 *.tiff
 *.tif
 *.webp
+!images/
+!images/football_yolo_readme_banner.png
 
 # Training dataset
 training/
@@ -86,7 +93,11 @@ football-players-detection-*/
 # Environment variables
 .env
 .env.local
-.env.*.local
+.env.*
+!.env.example
+
+# JavaScript tooling (if added later)
+node_modules/
 
 # IDE
 .vscode/
@@ -112,6 +123,11 @@ desktop.ini
 logs/
 *.log
 *.csv
+
+# Temporary and cache files
+.cache/
+.pytest_cache/
+*.bak
 
 # Git
 *.orig
