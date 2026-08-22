@@ -59,6 +59,7 @@
     width: 100%;
     display: block;
     background: #000;
+    min-height: 400px;
   }
   .tags {
     margin-top: 28px;
@@ -92,6 +93,14 @@
     color: #5c6664;
     font-size: 12px;
   }
+  .fallback-message {
+    color: #ff6b6b;
+    text-align: center;
+    padding: 20px;
+  }
+  .fallback-message a {
+    color: var(--green);
+  }
 </style>
 </head>
 <body>
@@ -105,10 +114,12 @@
   </p>
 
   <div class="video-wrap">
-    <video controls preload="metadata" poster="/football-yolo/assets/demo_thumbnail.png">
-      <source src="/football-yolo/assets/demo_vid.mp4" type="video/mp4">
-      Your browser doesn't support HTML5 video. You can
-      <a href="/football-yolo/assets/demo_vid.mp4">download the clip directly</a> instead.
+    <video controls preload="metadata" poster="./assets/demo_thumbnail.png">
+      <source src="./assets/demo_vid.mp4" type="video/mp4">
+      <p class="fallback-message">
+        Your browser doesn't support HTML5 video. You can
+        <a href="./assets/demo_vid.mp4">download the clip directly</a> instead.
+      </p>
     </video>
   </div>
 
@@ -124,6 +135,23 @@
   <a class="back" href="https://github.com/ashpe-osk/football-yolo">← Back to repository</a>
 
   <footer>Football YOLO · Ashpe Osk</footer>
+
+  <script>
+    // Debug helper - check if video loads
+    const video = document.querySelector('video');
+    if (video) {
+      video.addEventListener('error', function(e) {
+        console.error('Video failed to load');
+        console.log('Video src:', this.querySelector('source')?.src);
+        console.log('Poster:', this.poster);
+      });
+      
+      video.addEventListener('loadedmetadata', function() {
+        console.log('Video loaded successfully!');
+        console.log('Duration:', this.duration, 'seconds');
+      });
+    }
+  </script>
 
 </body>
 </html>

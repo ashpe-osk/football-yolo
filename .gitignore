@@ -62,10 +62,7 @@ stubs/
 
 # Data files (LARGE videos/images)
 data/
-*.mp4
-*.avi
 *.mov
-*.mkv
 *.flv
 *.wmv
 *.m4v
