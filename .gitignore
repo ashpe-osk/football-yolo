@@ -79,6 +79,7 @@ data/
 *.webp
 !images/
 !images/football_yolo_readme_banner.png
+!images/demo_thumbnail.png
 
 # Training dataset
 training/
