@@ -10,23 +10,6 @@ A computer vision project focused on extracting football analytics from broadcas
 
 Click the thumbnail to watch on the project's GitHub Pages demo site. The demo shows player detection, persistent tracking IDs, team classification, ball tracking, possession estimation, and camera-movement analysis on real broadcast footage.
 
-<details>
-<summary>Demo setup (one-time)</summary>
-
-1. **Compress the source video** (`.avi` → `.mp4`, keeps quality while cutting size well below GitHub Pages' comfortable range):
-   ```bash
-   ffmpeg -i football_yolo_videos_demo/demo_vid.avi \
-     -vcodec libx264 -crf 28 -preset slow \
-     -vf "scale=1280:-2" -movflags +faststart \
-     -acodec aac -b:a 128k \
-     docs/assets/demo_vid.mp4
-   ```
-2. Save a representative frame as `docs/assets/demo_thumbnail.png` (used as the video poster) and also as `images/demo_thumbnail.png` (used as the README thumbnail).
-3. In the repo: **Settings → Pages → Deploy from a branch → branch `main`, folder `/docs`**.
-4. Site goes live at `https://<username>.github.io/<repo>/` — update the link above if your username/repo differ.
-
-</details>
-
 ## Features
 
 - Detects players, referees, and the ball from broadcast footage
