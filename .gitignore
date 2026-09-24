@@ -150,3 +150,5 @@ settings.json
 *.pickle
 
 
+# other
+test_yolo26.py 
