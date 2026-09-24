@@ -61,6 +61,7 @@ cropped_images/
 stubs/
 
 # Data files (LARGE videos/images)
+evaluation/
 data/
 *.mov
 *.flv
@@ -94,7 +95,7 @@ football-players-detection-*/
 .env.*
 !.env.example
 
-# JavaScript tooling (if added later)
+# JavaScript tooling to be added later
 node_modules/
 
 # IDE
@@ -147,3 +148,5 @@ settings.json
 *.7z
 *.pkl
 *.pickle
+
+

@@ -1,10 +1,8 @@
 from huggingface_hub import hf_hub_download
 import os
 
-# Create models directory
 os.makedirs("models", exist_ok=True)
 
-# Download the model file
 print("Downloading YOLO26m football model from Hugging Face...")
 model_path = hf_hub_download(
     repo_id="HLouy/yolov26m-sportsmot-football",

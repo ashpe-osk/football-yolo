@@ -189,6 +189,24 @@ class TeamAllocator:
         print(f"Team 1 color: {self.team_colors[1]}")
         print(f"Team 2 color: {self.team_colors[2]}")
 
+    def get_team_labels(self):
+        """Map the detected red and white kits to the known team names."""
+        team_scores = {}
+        for team_id, color in self.team_colors.items():
+            blue, green, red = color
+            brightness = max(color) / 255.0
+            saturation = (max(color) - min(color)) / 255.0
+            red_score = max(0.0, red - (blue + green) / 2.0) / 255.0
+            white_score = brightness * (1.0 - saturation)
+            team_scores[team_id] = (red_score, white_score)
+
+        red_team = max(team_scores, key=lambda team_id: team_scores[team_id][0])
+        white_team = 1 if red_team == 2 else 2
+        return {
+            red_team: "Kenya (Red)",
+            white_team: "Uganda (White)"
+        }
+
     def get_player_team(self, frame, player_bbox, player_id):
         """
         Determine the team of a player using their Global ID.

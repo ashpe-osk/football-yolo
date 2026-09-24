@@ -97,7 +97,7 @@ main.py                       Main analysis pipeline
 track_player/                 YOLO and BoT-SORT tracking
 team_allocator/               Jersey-color team classification
 player_ball_assigner/         Ball-to-player assignment
-camera_movement/              Camera-motion utilities
+track_player/                 Tracking, identity association, and camera motion
 utils/                        Video and bounding-box helpers
 images/                       README portfolio banner + demo thumbnail
 docs/                         GitHub Pages demo site (index.html + compressed demo video)

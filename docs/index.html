@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Football YOLO - VID Demo</title>
+<title>Football YOLO - Demo</title>
 <style>
   :root {
     --green: #39d682;
@@ -135,23 +135,6 @@
   <a class="back" href="https://github.com/ashpe-osk/football-yolo">← Back to repository</a>
 
   <footer>Football YOLO · Ashpe Osk</footer>
-
-  <script>
-    // Debug helper - check if video loads
-    const video = document.querySelector('video');
-    if (video) {
-      video.addEventListener('error', function(e) {
-        console.error('Video failed to load');
-        console.log('Video src:', this.querySelector('source')?.src);
-        console.log('Poster:', this.poster);
-      });
-      
-      video.addEventListener('loadedmetadata', function() {
-        console.log('Video loaded successfully!');
-        console.log('Duration:', this.duration, 'seconds');
-      });
-    }
-  </script>
 
 </body>
 </html>

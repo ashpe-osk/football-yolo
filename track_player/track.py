@@ -5,9 +5,6 @@ import numpy as np
 import pandas as pd
 import pickle
 import os
-import sys
-
-sys.path.append("../")
 
 from utils.bbox_utils import get_center_of_bbox, get_bbox_width
 
@@ -223,7 +220,7 @@ class Tracker:
         good_current = current_points.reshape(-1, 2)[status == 1]
         if len(good_previous) < self.gmc_min_points:
             return np.eye(2, 3, dtype=np.float32), 0.0, len(good_previous)
-        matrix, inliers = cv2.estimateAffinePartial2D(
+        matrix, _ = cv2.estimateAffinePartial2D(
             good_previous,
             good_current,
             method=cv2.RANSAC,
@@ -371,10 +368,9 @@ class Tracker:
             if previous_frame is None:
                 camera_matrix = np.eye(2, 3, dtype=np.float32)
                 camera_motion = 0.0
-                flow_points = 0
                 self.camera_movement_per_frame.append((0.0, 0.0))  # first frame
             else:
-                camera_matrix, camera_motion, flow_points = self._estimate_camera_motion(previous_frame, frame)
+                camera_matrix, camera_motion, _ = self._estimate_camera_motion(previous_frame, frame)
                 tx = float(camera_matrix[0, 2])
                 ty = float(camera_matrix[1, 2])
                 self.camera_movement_per_frame.append((tx, ty))
@@ -812,10 +808,19 @@ class Tracker:
         cv2.drawContours(frame, [triangle_points], 0, (0, 0, 0), 2)
         return frame
 
-    def draw_team_ball_control(self, frame, frame_num, team_ball_control):
+    def draw_team_ball_control(
+        self,
+        frame,
+        frame_num,
+        team_ball_control,
+        team_labels=None,
+        team_colors=None
+    ):
+        team_labels = team_labels or {1: "Team 1", 2: "Team 2"}
+        team_colors = team_colors or {}
         overlay = frame.copy()
-        cv2.rectangle(overlay, (1350, 850), (1900, 970), (255, 255, 255), cv2.FILLED)
-        alpha = 0.4
+        cv2.rectangle(overlay, (1340, 835), (1900, 985), (20, 25, 30), cv2.FILLED)
+        alpha = 0.82
         cv2.addWeighted(overlay, alpha, frame, 1 - alpha, 0, frame)
 
         team_ball_control_till_frame = team_ball_control[:frame_num + 1]
@@ -829,13 +834,55 @@ class Tracker:
             team1_percent = team1_num_frames / total_frames * 100
             team2_percent = team2_num_frames / total_frames * 100
 
-        cv2.putText(frame, "POSSESSION", (1400, 885), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (0, 0, 0), 4)
-        cv2.putText(frame, f"Team 1 Possession: {team1_percent:.2f}%", (1400, 925), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
-        cv2.putText(frame, f"Team 2 Possession: {team2_percent:.2f}%", (1400, 965), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 0), 3)
+        label_colors = {
+            team_id: tuple(
+                int(max(0, min(255, round(channel))))
+                for channel in team_colors.get(team_id, (255, 255, 255))
+            )
+            for team_id in (1, 2)
+        }
+
+        cv2.putText(
+            frame,
+            "POSSESSION",
+            (1375, 870),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.9,
+            (255, 255, 255),
+            2,
+            cv2.LINE_AA
+        )
+        cv2.putText(
+            frame,
+            f"{team_labels[1].upper():<18}{team1_percent:5.1f}%",
+            (1375, 920),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            label_colors[1],
+            2,
+            cv2.LINE_AA
+        )
+        cv2.putText(
+            frame,
+            f"{team_labels[2].upper():<18}{team2_percent:5.1f}%",
+            (1375, 965),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.8,
+            label_colors[2],
+            2,
+            cv2.LINE_AA
+        )
 
         return frame
 
-    def draw_annotations(self, video_frames, tracks, team_ball_control):
+    def draw_annotations(
+        self,
+        video_frames,
+        tracks,
+        team_ball_control,
+        team_labels=None,
+        team_colors=None
+    ):
         output_video_frames = []
         for frame_num, frame in enumerate(video_frames):
             frame = frame.copy()
@@ -855,7 +902,13 @@ class Tracker:
             for _, ball in ball_dict.items():
                 frame = self.draw_triangle(frame, ball["bbox"], (0, 255, 0))
 
-            frame = self.draw_team_ball_control(frame, frame_num, team_ball_control)
+            frame = self.draw_team_ball_control(
+                frame,
+                frame_num,
+                team_ball_control,
+                team_labels,
+                team_colors
+            )
 
             output_video_frames.append(frame)
         return output_video_frames
