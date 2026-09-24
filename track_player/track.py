@@ -13,23 +13,23 @@ class Tracker:
 
     def __init__(self, model_path):
 
-        # =================================================
+        
         # YOLOv26 - PLAYER DETECTOR + TRACKER
-        # =================================================
+        
 
         self.model = YOLO(model_path)
 
-        # =================================================
+        
         # YOLO11 - BALL + REFEREE DETECTOR
-        # =================================================
+        
 
         self.ball_referee_model = YOLO(
             r"C:\football-yolo\models\ball_referee.pt"
         )
 
-        # =================================================
+        
         # BoT-SORT + ReID
-        # =================================================
+        
 
         self.tracker_config = (
             r"C:\football-yolo\track_player\botsort_reid.yaml"
@@ -37,26 +37,26 @@ class Tracker:
 
         self.draw = sv.EllipseAnnotator()
 
-        # =================================================
+        
         # GLOBAL ID STATE
-        # =================================================
+        
 
         self.next_global_id = 1
         self.global_tracks = {}
         self.tracker_to_global = {}
 
-        # =================================================
+        
         # GLOBAL TRACK SETTINGS
-        # =================================================
+        
 
         self.global_max_age = 300
         self.max_position_distance = 0.35
         self.max_appearance_distance = 0.65
         self.max_combined_distance = 1.0
 
-        # =================================================
+        
         # CAMERA MOTION / RECOVERY SETTINGS
-        # =================================================
+        
 
         self.recovery_duration = 10
         self.recovery_until = -1
@@ -66,14 +66,14 @@ class Tracker:
         self.gmc_min_points = 12
         self.debug_camera = True
 
-        # =================================================
+        
         # CAMERA MOVEMENT DATA
-        # =================================================
+        
         self.camera_movement_per_frame = []   # will store (tx, ty) per frame
 
-    # =====================================================
+   
     # BALL INTERPOLATION
-    # =====================================================
+   
 
     def interpolate_ball_positions(self, ball_positions):
         ball_positions = [x.get(1, {}).get("bbox", []) for x in ball_positions]
@@ -83,9 +83,9 @@ class Tracker:
         ball_positions = [{1: {'bbox': x}} for x in df_ball_positions.to_numpy().tolist()]
         return ball_positions
 
-    # =====================================================
+   
     # DETECTION + TRACKING
-    # =====================================================
+   
 
     def detect_frames(self, frames):
         detections = []
@@ -111,9 +111,9 @@ class Tracker:
             print(f"Frame {frame_num}: YOLOv26 tracking complete")
         return detections
 
-    # =====================================================
+   
     # CAMERA MOVEMENT COMPUTATION (standalone)
-    # =====================================================
+   
 
     def compute_camera_movement(self, frames):
         """
@@ -136,9 +136,9 @@ class Tracker:
         self.camera_movement_per_frame = movement
         return movement
 
-    # =====================================================
+   
     # BASIC GEOMETRY HELPERS
-    # =====================================================
+   
 
     @staticmethod
     def _bbox_center(bbox):
@@ -187,9 +187,9 @@ class Tracker:
             return 0.0
         return intersection / union
 
-    # =====================================================
+   
     # CAMERA MOTION ESTIMATION
-    # =====================================================
+   
 
     def _estimate_camera_motion(self, previous_frame, current_frame):
         height, width = previous_frame.shape[:2]
@@ -253,9 +253,9 @@ class Tracker:
         transformed_y = matrix[1, 0] * x + matrix[1, 1] * y
         return np.array([transformed_x, transformed_y], dtype=np.float32)
 
-    # =====================================================
+   
     # APPEARANCE FEATURE
-    # =====================================================
+   
 
     def _appearance_feature(self, frame, bbox):
         h, w = frame.shape[:2]
@@ -306,9 +306,9 @@ class Tracker:
         ratio = min(area_a / (area_b + 1e-6), area_b / (area_a + 1e-6))
         return float(1.0 - ratio)
 
-    # =====================================================
+   
     # PREDICT GLOBAL TRACK POSITION
-    # =====================================================
+   
 
     def _predict_global_position(self, state, current_frame_num, current_camera_matrix):
         center = state["predicted_center"].copy()
@@ -321,9 +321,9 @@ class Tracker:
         predicted = camera_center + transformed_velocity
         return predicted
 
-    # =====================================================
+   
     # CREATE GLOBAL ID
-    # =====================================================
+   
 
     def _create_global_id(self, tracker_id, bbox, frame, frame_num, appearance=None):
         gid = self.next_global_id
@@ -344,9 +344,9 @@ class Tracker:
             self.tracker_to_global[tracker_id] = gid
         return gid
 
-    # =====================================================
+   
     # GLOBAL ID ASSOCIATION
-    # =====================================================
+   
 
     def _associate_global_ids(self, frames, tracks):
         self.next_global_id = 1
@@ -645,9 +645,9 @@ class Tracker:
 
         return tracks
 
-    # =====================================================
+   
     # ADD POSITIONS TO TRACKS
-    # =====================================================
+   
 
     def add_positions_to_tracks(self, tracks):
         """
@@ -671,9 +671,9 @@ class Tracker:
                     track_info['position'] = position
         return tracks
 
-    # =====================================================
+   
     # DRAW CAMERA MOVEMENT
-    # =====================================================
+   
 
     def draw_camera_movement(self, frames, camera_movement_per_frame):
         output_frames = []
@@ -693,9 +693,9 @@ class Tracker:
             output_frames.append(frame)
         return output_frames
 
-    # =====================================================
+   
     # GET TRACKS
-    # =====================================================
+   
 
     def get_objects_tracks(self, frames, read_from_stub=False, stub_path=None):
         if read_from_stub and stub_path is not None and os.path.exists(stub_path):
@@ -763,9 +763,9 @@ class Tracker:
 
         return tracks
 
-    # =====================================================
+   
     # DRAW ELLIPSE
-    # =====================================================
+   
 
     def draw_ellipse(self, frame, bbox, color, track_id=None):
         y2 = int(bbox[3])

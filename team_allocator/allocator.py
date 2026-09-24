@@ -59,9 +59,9 @@ class TeamAllocator:
 
         player_h, player_w = player_image.shape[:2]
 
-        # ---------------------------------------------------------
+        
         # CENTRAL TORSO REGION
-        # ---------------------------------------------------------
+        
         #
         # Ignore:
         # - head
@@ -85,9 +85,9 @@ class TeamAllocator:
         if torso.size == 0:
             torso = player_image
 
-        # ---------------------------------------------------------
+        
         # REMOVE VERY GREEN PIXELS
-        # ---------------------------------------------------------
+        
         #
         # The pitch is green, so remove pixels that are strongly
         # green. This prevents grass from becoming the "jersey".
@@ -112,9 +112,9 @@ class TeamAllocator:
         if len(pixels) < 20:
             pixels = torso.reshape(-1, 3)
 
-        # ---------------------------------------------------------
+        
         # KMEANS ON TORSO
-        # ---------------------------------------------------------
+        
 
         if len(pixels) < 2:
             return np.mean(torso.reshape(-1, 3), axis=0)
@@ -167,9 +167,9 @@ class TeamAllocator:
 
         player_colors = np.array(player_colors)
 
-        # ---------------------------------------------------------
+        
         # CLUSTER THE PLAYERS INTO TWO TEAMS
-        # ---------------------------------------------------------
+        
 
         kmeans = KMeans(
             n_clusters=2,
@@ -226,9 +226,9 @@ class TeamAllocator:
             player_bbox
         )
 
-        # ---------------------------------------------------------
+        
         # STORE COLOR HISTORY FOR THIS GLOBAL PLAYER ID
-        # ---------------------------------------------------------
+        
 
         if player_id not in self.player_color_history:
             self.player_color_history[player_id] = []
@@ -240,9 +240,9 @@ class TeamAllocator:
             self.player_color_history[player_id] = \
                 self.player_color_history[player_id][-10:]
 
-        # ---------------------------------------------------------
+        
         # USE AVERAGE COLOR FROM MULTIPLE OBSERVATIONS
-        # ---------------------------------------------------------
+        
 
         color_history = np.array(
             self.player_color_history[player_id]
@@ -253,9 +253,9 @@ class TeamAllocator:
             axis=0
         )
 
-        # ---------------------------------------------------------
+        
         # PREDICT TEAM
-        # ---------------------------------------------------------
+        
 
         team_id = self.kmeans.predict(
             average_color.reshape(1, -1)
