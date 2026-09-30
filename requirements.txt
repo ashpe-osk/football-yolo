@@ -24,6 +24,7 @@ httpcore==1.0.9
 httpx==0.28.1
 huggingface_hub==1.27.0
 idna==3.18
+inference==1.7.2
 ipykernel==7.3.0
 ipython==8.39.0
 jedi==0.20.0

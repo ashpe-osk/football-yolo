@@ -1,5 +1,21 @@
 import cv2
+import math
 import os
+
+
+def get_video_fps(video_path):
+    """Return the source video's frame rate, failing clearly if unavailable."""
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        cap.release()
+        raise ValueError(f"Could not open video to read its frame rate: {video_path}")
+
+    fps = float(cap.get(cv2.CAP_PROP_FPS))
+    cap.release()
+    if not math.isfinite(fps) or fps <= 0:
+        raise ValueError(f"Video has an invalid frame rate ({fps}): {video_path}")
+    return fps
+
 
 def read_video(video_path):
     """
@@ -44,7 +60,7 @@ def read_video(video_path):
     return frames
 
 
-def save_video(output_video_frames, output_video_path):
+def save_video(output_video_frames, output_video_path, fps=24):
     """
     Save frames as a video file
     """
@@ -65,7 +81,7 @@ def save_video(output_video_frames, output_video_path):
         
         # Define codec and create VideoWriter
         fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        out = cv2.VideoWriter(output_video_path, fourcc, 24, (width, height))
+        out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
         
         # Check if VideoWriter was created successfully
         if not out.isOpened():

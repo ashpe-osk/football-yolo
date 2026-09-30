@@ -4,11 +4,18 @@ import numpy as np
 
 
 class TeamAllocator:
+    TORSO_Y_START = 0.18
+    TORSO_Y_END = 0.50
+    TORSO_X_START = 0.35
+    TORSO_X_END = 0.65
+    MIN_USABLE_PIXELS = 20
+    MIN_TRACK_SAMPLES = 1
+
     def __init__(self):
         self.team_colors = {}
         self.player_team_dict = {}
+        self.player_team_history = {}
         self.player_color_history = {}
-
         self.kmeans = None
 
     def get_clustering_model(self, image):
@@ -71,11 +78,10 @@ class TeamAllocator:
         # Focus on the middle part where the jersey is.
         #
 
-        torso_y1 = int(player_h * 0.20)
-        torso_y2 = int(player_h * 0.65)
-
-        torso_x1 = int(player_w * 0.20)
-        torso_x2 = int(player_w * 0.80)
+        torso_y1 = int(player_h * self.TORSO_Y_START)
+        torso_y2 = int(player_h * self.TORSO_Y_END)
+        torso_x1 = int(player_w * self.TORSO_X_START)
+        torso_x2 = int(player_w * self.TORSO_X_END)
 
         torso = player_image[
             torso_y1:torso_y2,
@@ -108,38 +114,12 @@ class TeamAllocator:
 
         pixels = torso[non_green_mask > 0]
 
-        # If too few useful pixels remain, use the whole torso
-        if len(pixels) < 20:
+        if len(pixels) < self.MIN_USABLE_PIXELS:
             pixels = torso.reshape(-1, 3)
 
-        
-        # KMEANS ON TORSO
-        
-
-        if len(pixels) < 2:
-            return np.mean(torso.reshape(-1, 3), axis=0)
-
-        kmeans = KMeans(
-            n_clusters=2,
-            init="k-means++",
-            n_init=10,
-            random_state=42
-        )
-
-        kmeans.fit(pixels)
-
-        labels = kmeans.labels_
-        centers = kmeans.cluster_centers_
-
-        # Count pixels in each cluster
-        counts = np.bincount(labels)
-
-        # The dominant cluster is usually the jersey
-        player_cluster = np.argmax(counts)
-
-        player_color = centers[player_cluster]
-
-        return player_color
+        # Median color is less affected than per-crop KMeans by skin, stripes,
+        # and a few background pixels leaking into small player boxes.
+        return np.median(pixels, axis=0).astype(np.float32)
 
     def allocate_teams(self, frame, player_detections):
         """
@@ -182,8 +162,11 @@ class TeamAllocator:
 
         self.kmeans = kmeans
 
-        self.team_colors[1] = kmeans.cluster_centers_[0]
-        self.team_colors[2] = kmeans.cluster_centers_[1]
+        self.kmeans = kmeans
+        self.team_colors = {
+            1: kmeans.cluster_centers_[0],
+            2: kmeans.cluster_centers_[1]
+        }
 
         print("\nTeam colors initialized:")
         print(f"Team 1 color: {self.team_colors[1]}")
@@ -211,8 +194,7 @@ class TeamAllocator:
         """
         Determine the team of a player using their Global ID.
 
-        Multiple observations are stored for each Global ID instead
-        of trusting one single frame.
+        Record the observed team vote for later per-track stabilization.
         """
 
         if self.kmeans is None:
@@ -227,43 +209,62 @@ class TeamAllocator:
         )
 
         
-        # STORE COLOR HISTORY FOR THIS GLOBAL PLAYER ID
-        
+        if not np.isfinite(player_color).all() or np.linalg.norm(player_color) <= 1:
+            return self.player_team_dict.get(player_id, 0)
 
-        if player_id not in self.player_color_history:
-            self.player_color_history[player_id] = []
-
-        self.player_color_history[player_id].append(player_color)
-
-        # Keep only the most recent observations
-        if len(self.player_color_history[player_id]) > 10:
-            self.player_color_history[player_id] = \
-                self.player_color_history[player_id][-10:]
-
-        
-        # USE AVERAGE COLOR FROM MULTIPLE OBSERVATIONS
-        
-
-        color_history = np.array(
-            self.player_color_history[player_id]
+        self.player_color_history.setdefault(player_id, []).append(
+            player_color.astype(np.float32)
         )
-
-        average_color = np.mean(
-            color_history,
-            axis=0
-        )
-
-        
-        # PREDICT TEAM
-        
-
-        team_id = self.kmeans.predict(
-            average_color.reshape(1, -1)
-        )[0]
-
-        team_id = int(team_id) + 1
-
-        # Store current team
+        team_id = int(self.kmeans.predict(player_color.reshape(1, -1))[0]) + 1
+        self.player_team_history.setdefault(player_id, []).append(team_id)
         self.player_team_dict[player_id] = team_id
-
         return team_id
+
+    def finalize_player_teams(self):
+        """Assign each track from a majority vote of its first five samples."""
+        if self.kmeans is None:
+            raise RuntimeError(
+                "Teams have not been allocated. "
+                "Call allocate_teams() first."
+            )
+
+        track_colors = {}
+        for player_id, samples in self.player_color_history.items():
+            if len(samples) < self.MIN_TRACK_SAMPLES:
+                continue
+            track_colors[player_id] = np.median(
+                np.asarray(samples, dtype=np.float32),
+                axis=0
+            )
+
+        if len(track_colors) < 2:
+            raise RuntimeError(
+                "At least two sampled player tracks are needed to finalize teams."
+            )
+
+        player_ids = list(track_colors)
+        aggregated_colors = np.asarray(
+            [track_colors[player_id] for player_id in player_ids],
+            dtype=np.float32
+        )
+        kmeans = KMeans(
+            n_clusters=2,
+            init="k-means++",
+            n_init=20,
+            random_state=42
+        )
+        kmeans.fit(aggregated_colors)
+        self.kmeans = kmeans
+        self.team_colors = {
+            1: kmeans.cluster_centers_[0],
+            2: kmeans.cluster_centers_[1]
+        }
+        self.player_team_dict = {
+            player_id: int(team_id) + 1
+            for player_id, team_id in zip(
+                player_ids,
+                kmeans.labels_
+            )
+        }
+
+        return self.player_team_dict.copy()
